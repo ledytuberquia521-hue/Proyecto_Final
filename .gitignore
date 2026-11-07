@@ -1,0 +1,13 @@
+# Credenciales
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Modelos pesados opcionales (el JSON sí se sube)
+models/*.pkl
+models/*.joblib

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pronóstico</title>
+<!--
+  ESQUELETO DEL FRONTEND
+  ======================
+  Esta página ya funciona: pide el pronóstico a la API y lo muestra en una
+  tabla sin formato. Tu trabajo es convertirla en una interfaz de verdad.
+
+  Requisitos mínimos (ver README, Fase 2):
+    1. Una gráfica con el histórico, el pronóstico y el intervalo de confianza.
+    2. Las horas en hora de Colombia (la API las entrega en UTC, con "Z").
+    3. Al menos un indicador destacado (p.ej. valor de la próxima hora,
+       máximo esperado, hora del último dato).
+    4. Controles para elegir cuántas horas pronosticar.
+    5. Un mensaje claro cuando la API responde con error.
+
+  Puedes usar cualquier librería de gráficas cargada desde un CDN
+  (Chart.js, Plotly, ECharts...) y poner archivos .css o .js en esta misma
+  carpeta: se sirven en /static/<nombre>.
+
+  Endpoints disponibles (pruébalos en /docs):
+    GET /api/prediccion?horas=12&historia=48&confianza=0.95
+    GET /api/historico?horas=48
+    GET /api/modelo
+    GET /api/salud
+-->
+</head>
+<body>
+  <h1>Pronóstico</h1>
+  <p id="estado">Consultando la API…</p>
+  <table border="1" cellpadding="4">
+    <thead><tr><th>tiempo (UTC)</th><th>prediccion</th><th>limite_inferior</th><th>limite_superior</th></tr></thead>
+    <tbody id="filas"></tbody>
+  </table>
+
+<script>
+async function cargar() {
+  const estado = document.getElementById("estado");
+  try {
+    const respuesta = await fetch("/api/prediccion?horas=12&historia=48");
+    const datos = await respuesta.json();
+    if (!respuesta.ok) throw new Error(datos.detail);
+
+    // datos.historico  -> [{tiempo, valor}, ...]            (horas pasadas)
+    // datos.prediccion -> [{tiempo, prediccion, limite_inferior, limite_superior}, ...]
+    console.log(datos);   // abre la consola del navegador (F12) para explorarlo
+
+    document.getElementById("filas").innerHTML = datos.prediccion.map(p =>
+      `<tr><td>${p.tiempo}</td><td>${p.prediccion}</td><td>${p.limite_inferior}</td><td>${p.limite_superior}</td></tr>`
+    ).join("");
+    estado.textContent = `Último dato real: ${datos.ultima_observacion}`;
+  } catch (error) {
+    estado.textContent = "Error: " + error.message;
+  }
+}
+cargar();
+</script>
+</body>
+</html>

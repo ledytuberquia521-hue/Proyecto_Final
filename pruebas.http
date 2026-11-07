@@ -1,0 +1,18 @@
+### Pruebas rápidas de la API (extensión REST Client: clic en "Send Request")
+
+@base = http://localhost:8000
+
+### Estado
+GET {{base}}/api/salud
+
+### Últimas 24 horas desde InfluxDB
+GET {{base}}/api/historico?horas=24
+
+### Pronóstico de 12 horas
+GET {{base}}/api/prediccion?horas=12&historia=24&confianza=0.95
+
+### Información del modelo
+GET {{base}}/api/modelo
+
+### Recargar el modelo después de git pull
+POST {{base}}/api/modelo/recargar

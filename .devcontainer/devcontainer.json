@@ -1,0 +1,21 @@
+{
+  "name": "Proyecto final - Pronóstico SARIMA + InfluxDB",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "hostRequirements": {
+    "cpus": 2
+  },
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "API de pronóstico",
+      "onAutoForward": "notify"
+    }
+  },
+  "secrets": {
+    "INFLUX_URL":    { "description": "URL de InfluxDB, p.ej. https://us-east-1-1.aws.cloud2.influxdata.com" },
+    "INFLUX_TOKEN":  { "description": "Token de lectura de InfluxDB" },
+    "INFLUX_ORG":    { "description": "Organización de InfluxDB" },
+    "INFLUX_BUCKET": { "description": "Bucket con los datos" }
+  },
+  "postCreateCommand": "pip install -r requirements.txt"
+}
