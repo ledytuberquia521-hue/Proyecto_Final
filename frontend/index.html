@@ -3,61 +3,117 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pronóstico</title>
-<!--
-  ESQUELETO DEL FRONTEND
-  ======================
-  Esta página ya funciona: pide el pronóstico a la API y lo muestra en una
-  tabla sin formato. Tu trabajo es convertirla en una interfaz de verdad.
-
-  Requisitos mínimos (ver README, Fase 2):
-    1. Una gráfica con el histórico, el pronóstico y el intervalo de confianza.
-    2. Las horas en hora de Colombia (la API las entrega en UTC, con "Z").
-    3. Al menos un indicador destacado (p.ej. valor de la próxima hora,
-       máximo esperado, hora del último dato).
-    4. Controles para elegir cuántas horas pronosticar.
-    5. Un mensaje claro cuando la API responde con error.
-
-  Puedes usar cualquier librería de gráficas cargada desde un CDN
-  (Chart.js, Plotly, ECharts...) y poner archivos .css o .js en esta misma
-  carpeta: se sirven en /static/<nombre>.
-
-  Endpoints disponibles (pruébalos en /docs):
-    GET /api/prediccion?horas=12&historia=48&confianza=0.95
-    GET /api/historico?horas=48
-    GET /api/modelo
-    GET /api/salud
--->
+<title>Pronóstico horario · SARIMA</title>
+<link rel="stylesheet" href="/static/estilos.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <h1>Pronóstico</h1>
-  <p id="estado">Consultando la API…</p>
-  <table border="1" cellpadding="4">
-    <thead><tr><th>tiempo (UTC)</th><th>prediccion</th><th>limite_inferior</th><th>limite_superior</th></tr></thead>
-    <tbody id="filas"></tbody>
-  </table>
+<header class="encabezado">
+  <div>
+    <h1>Pronóstico horario</h1>
+    <p class="subtitulo" id="subtitulo">Modelo SARIMA sobre datos de InfluxDB</p>
+  </div>
+  <div class="salud" id="salud">
+    <span class="punto" id="punto-salud"></span>
+    <span id="texto-salud">Verificando servicio…</span>
+  </div>
+</header>
 
-<script>
-async function cargar() {
-  const estado = document.getElementById("estado");
-  try {
-    const respuesta = await fetch("/api/prediccion?horas=12&historia=48");
-    const datos = await respuesta.json();
-    if (!respuesta.ok) throw new Error(datos.detail);
+<main>
+  <!-- Requisito 4: controles -->
+  <section class="tarjeta controles" aria-label="Controles del pronóstico">
+    <div class="control">
+      <label for="horas">Horas a pronosticar: <strong id="horas-valor">12</strong></label>
+      <input type="range" id="horas" min="1" max="72" value="12">
+      <div class="atajos">
+        <button type="button" data-horas="6">6 h</button>
+        <button type="button" data-horas="12">12 h</button>
+        <button type="button" data-horas="24">24 h</button>
+        <button type="button" data-horas="48">48 h</button>
+      </div>
+    </div>
+    <div class="control">
+      <label for="historia">Historia a mostrar</label>
+      <select id="historia">
+        <option value="24">Últimas 24 h</option>
+        <option value="48" selected>Últimas 48 h</option>
+        <option value="72">Últimos 3 días</option>
+        <option value="168">Última semana</option>
+      </select>
+    </div>
+    <div class="control">
+      <label for="confianza">Intervalo de confianza</label>
+      <select id="confianza">
+        <option value="0.8">80 %</option>
+        <option value="0.9">90 %</option>
+        <option value="0.95" selected>95 %</option>
+        <option value="0.99">99 %</option>
+      </select>
+    </div>
+    <button type="button" id="actualizar" class="primario">Actualizar</button>
+  </section>
 
-    // datos.historico  -> [{tiempo, valor}, ...]            (horas pasadas)
-    // datos.prediccion -> [{tiempo, prediccion, limite_inferior, limite_superior}, ...]
-    console.log(datos);   // abre la consola del navegador (F12) para explorarlo
+  <!-- Requisito 5: mensaje de error -->
+  <div class="error" id="error" role="alert" hidden>
+    <strong>No se pudo obtener el pronóstico.</strong>
+    <span id="error-texto"></span>
+  </div>
 
-    document.getElementById("filas").innerHTML = datos.prediccion.map(p =>
-      `<tr><td>${p.tiempo}</td><td>${p.prediccion}</td><td>${p.limite_inferior}</td><td>${p.limite_superior}</td></tr>`
-    ).join("");
-    estado.textContent = `Último dato real: ${datos.ultima_observacion}`;
-  } catch (error) {
-    estado.textContent = "Error: " + error.message;
-  }
-}
-cargar();
-</script>
+  <!-- Requisito 3: indicadores destacados -->
+  <section class="indicadores" aria-label="Indicadores">
+    <article class="tarjeta indicador destacado">
+      <h2>Próxima hora</h2>
+      <p class="valor" id="ind-proxima">—</p>
+      <p class="detalle" id="ind-proxima-det">&nbsp;</p>
+    </article>
+    <article class="tarjeta indicador">
+      <h2>Máximo esperado</h2>
+      <p class="valor" id="ind-max">—</p>
+      <p class="detalle" id="ind-max-det">&nbsp;</p>
+    </article>
+    <article class="tarjeta indicador">
+      <h2>Mínimo esperado</h2>
+      <p class="valor" id="ind-min">—</p>
+      <p class="detalle" id="ind-min-det">&nbsp;</p>
+    </article>
+    <article class="tarjeta indicador">
+      <h2>Último dato real</h2>
+      <p class="valor pequeno" id="ind-ultimo">—</p>
+      <p class="detalle" id="ind-ultimo-det">&nbsp;</p>
+    </article>
+  </section>
+
+  <!-- Requisito 1: gráfica con histórico, pronóstico e intervalo -->
+  <section class="tarjeta grafica">
+    <div class="grafica-titulo">
+      <h2>Histórico y pronóstico</h2>
+      <span class="nota">Horas en hora de Colombia (UTC−5)</span>
+    </div>
+    <div class="lienzo"><canvas id="grafica"></canvas></div>
+    <p class="cargando" id="cargando" hidden>Consultando la API…</p>
+  </section>
+
+  <section class="dos-columnas">
+    <article class="tarjeta">
+      <h2>Tabla del pronóstico</h2>
+      <div class="tabla-scroll">
+        <table>
+          <thead><tr><th>Hora (Colombia)</th><th>Pronóstico</th><th>Lím. inferior</th><th>Lím. superior</th></tr></thead>
+          <tbody id="filas"></tbody>
+        </table>
+      </div>
+    </article>
+    <article class="tarjeta">
+      <h2>Sobre el modelo</h2>
+      <dl class="modelo" id="modelo">
+        <dt>Estado</dt><dd>Cargando…</dd>
+      </dl>
+    </article>
+  </section>
+</main>
+
+<footer>Computación Avanzada (ET0197) · FastAPI + SARIMA + InfluxDB</footer>
+
+<script src="/static/app.js"></script>
 </body>
 </html>

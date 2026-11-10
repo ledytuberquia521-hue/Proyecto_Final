@@ -1,0 +1,113 @@
+:root {
+  --fondo: #f4f6f8;
+  --tarjeta: #ffffff;
+  --texto: #1d2733;
+  --suave: #5f6b7a;
+  --borde: #dfe4ea;
+  --historico: #2f3e4e;
+  --pronostico: #0b7a75;
+  --banda: rgba(11, 122, 117, 0.16);
+  --error-fondo: #fdecea;
+  --error-borde: #e0a39c;
+  --error-texto: #8a1f11;
+  --ok: #1e8e3e;
+  --alerta: #c77700;
+  --mal: #c5221f;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 28px;
+  background: var(--tarjeta);
+  border-bottom: 1px solid var(--borde);
+}
+h1 { margin: 0; font-size: 1.6rem; }
+h2 { margin: 0 0 10px; font-size: 1rem; color: var(--suave); font-weight: 600; }
+.subtitulo { margin: 2px 0 0; color: var(--suave); }
+
+.salud {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border: 1px solid var(--borde); border-radius: 999px;
+  font-size: 0.9rem;
+}
+.punto { width: 10px; height: 10px; border-radius: 50%; background: var(--suave); }
+.punto.ok { background: var(--ok); }
+.punto.alerta { background: var(--alerta); }
+.punto.mal { background: var(--mal); }
+
+main { max-width: 1200px; margin: 0 auto; padding: 20px 28px 8px; display: grid; gap: 18px; }
+
+.tarjeta {
+  background: var(--tarjeta);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.controles { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+.control { display: grid; gap: 6px; min-width: 180px; }
+.control:first-child { flex: 1; min-width: 260px; }
+label { font-size: 0.9rem; color: var(--suave); }
+input[type="range"] { width: 100%; accent-color: var(--pronostico); }
+select { padding: 7px 8px; border: 1px solid var(--borde); border-radius: 6px; font-size: 0.95rem; background: #fff; }
+.atajos { display: flex; gap: 6px; }
+button {
+  font: inherit; font-size: 0.85rem; cursor: pointer;
+  padding: 5px 10px; border: 1px solid var(--borde); border-radius: 6px; background: #fff;
+}
+button:hover { border-color: var(--pronostico); }
+button.activo { background: var(--pronostico); color: #fff; border-color: var(--pronostico); }
+button.primario {
+  background: var(--pronostico); color: #fff; border-color: var(--pronostico);
+  padding: 8px 18px; font-size: 0.95rem;
+}
+button:disabled { opacity: 0.6; cursor: wait; }
+
+.error {
+  background: var(--error-fondo); border: 1px solid var(--error-borde); color: var(--error-texto);
+  border-radius: 10px; padding: 12px 16px; display: grid; gap: 4px;
+}
+
+.indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.indicador .valor { margin: 0; font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.indicador .valor.pequeno { font-size: 1.35rem; padding-top: 8px; }
+.indicador .detalle { margin: 4px 0 0; color: var(--suave); font-size: 0.85rem; }
+.indicador.destacado { border-left: 5px solid var(--pronostico); }
+.indicador.destacado .valor { color: var(--pronostico); }
+
+.grafica-titulo { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.nota { color: var(--suave); font-size: 0.85rem; }
+.lienzo { position: relative; height: 380px; }
+.cargando { text-align: center; color: var(--suave); margin: 8px 0 0; }
+
+.dos-columnas { display: grid; grid-template-columns: 3fr 2fr; gap: 18px; }
+@media (max-width: 800px) { .dos-columnas { grid-template-columns: 1fr; } }
+
+.tabla-scroll { max-height: 320px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--borde); }
+th:first-child, td:first-child { text-align: left; }
+thead th { position: sticky; top: 0; background: var(--tarjeta); color: var(--suave); font-weight: 600; }
+
+.modelo { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 0.92rem; }
+.modelo dt { color: var(--suave); }
+.modelo dd { margin: 0; font-weight: 600; }
+.aviso { color: var(--alerta); }
+
+footer { text-align: center; color: var(--suave); font-size: 0.8rem; padding: 18px; }

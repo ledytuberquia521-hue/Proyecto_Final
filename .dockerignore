@@ -1,0 +1,32 @@
+# Credenciales: nunca dentro de la imagen
+.env
+.env.*
+!.env.example
+
+# Control de versiones y entorno de desarrollo
+.git
+.gitignore
+.github
+.devcontainer
+.vscode
+
+# Lo que no necesita la app para correr
+notebooks/
+scripts/
+pruebas.http
+README.md
+Dockerfile
+.dockerignore
+
+# Cachés y entornos de Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+.pytest_cache/
+
+# Modelos pesados opcionales (el JSON sí entra)
+models/*.pkl
+models/*.joblib
