@@ -3,116 +3,365 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pronóstico horario · SARIMA</title>
+<title>Centro de pronóstico · Consumo del servidor</title>
 <link rel="stylesheet" href="/static/estilos.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
+
+<!-- ======================================================= ENCABEZADO -->
 <header class="encabezado">
-  <div>
-    <h1>Pronóstico horario</h1>
-    <p class="subtitulo" id="subtitulo">Modelo SARIMA sobre datos de InfluxDB</p>
+  <div class="marca">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32"><path d="M3 22 L10 15 L15 19 L22 9 L29 13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="29" cy="13" r="2.6" fill="currentColor"/></svg>
+    </div>
+    <div>
+      <h1>Centro de pronóstico</h1>
+      <p class="subtitulo" id="subtitulo">Pronóstico horario con SARIMA sobre datos de InfluxDB</p>
+    </div>
   </div>
-  <div class="salud" id="salud">
-    <span class="punto" id="punto-salud"></span>
-    <span id="texto-salud">Verificando servicio…</span>
+  <div class="estado-servicio">
+    <span class="actualizado" id="actualizado">—</span>
+    <label class="auto"><input type="checkbox" id="auto" checked> Auto cada 5 min</label>
+    <div class="salud" id="salud" title="Estado del servicio (/api/salud)">
+      <span class="punto" id="punto-salud"></span>
+      <span id="texto-salud">Verificando…</span>
+    </div>
   </div>
 </header>
 
-<main>
-  <!-- Requisito 4: controles -->
-  <section class="tarjeta controles" aria-label="Controles del pronóstico">
-    <div class="control">
-      <label for="horas">Horas a pronosticar: <strong id="horas-valor">12</strong></label>
-      <input type="range" id="horas" min="1" max="72" value="12">
-      <div class="atajos">
-        <button type="button" data-horas="6">6 h</button>
-        <button type="button" data-horas="12">12 h</button>
-        <button type="button" data-horas="24">24 h</button>
-        <button type="button" data-horas="48">48 h</button>
-      </div>
+<!-- ======================================================= CONTROLES (requisito 4) -->
+<section class="barra-controles" aria-label="Controles">
+  <div class="control control-horas">
+    <label for="horas">Horizonte del pronóstico <strong id="horas-valor">12 h</strong></label>
+    <input type="range" id="horas" min="1" max="72" value="12">
+    <div class="atajos" role="group" aria-label="Atajos de horizonte">
+      <button type="button" data-horas="6">6 h</button>
+      <button type="button" data-horas="12">12 h</button>
+      <button type="button" data-horas="24">24 h</button>
+      <button type="button" data-horas="48">48 h</button>
+      <button type="button" data-horas="72">72 h</button>
     </div>
-    <div class="control">
-      <label for="historia">Historia a mostrar</label>
-      <select id="historia">
-        <option value="24">Últimas 24 h</option>
-        <option value="48" selected>Últimas 48 h</option>
-        <option value="72">Últimos 3 días</option>
-        <option value="168">Última semana</option>
-      </select>
-    </div>
-    <div class="control">
-      <label for="confianza">Intervalo de confianza</label>
-      <select id="confianza">
-        <option value="0.8">80 %</option>
-        <option value="0.9">90 %</option>
-        <option value="0.95" selected>95 %</option>
-        <option value="0.99">99 %</option>
-      </select>
-    </div>
-    <button type="button" id="actualizar" class="primario">Actualizar</button>
-  </section>
+  </div>
+  <div class="control">
+    <label for="historia">Historia en la gráfica</label>
+    <select id="historia">
+      <option value="24">Últimas 24 h</option>
+      <option value="48" selected>Últimas 48 h</option>
+      <option value="72">Últimos 3 días</option>
+      <option value="168">Última semana</option>
+      <option value="336">Últimas 2 semanas</option>
+    </select>
+  </div>
+  <div class="control">
+    <label for="confianza">Banda exterior</label>
+    <select id="confianza">
+      <option value="0.9">90 %</option>
+      <option value="0.95" selected>95 %</option>
+      <option value="0.99">99 %</option>
+    </select>
+  </div>
+  <div class="control">
+    <label for="umbral">Umbral de alerta <span class="ayuda" tabindex="0" data-ayuda="Valor que no quieres superar (por ejemplo, la capacidad contratada). Por defecto es el percentil 90 de las últimas 2 semanas: solo el 10 % de las horas lo superaron.">?</span></label>
+    <input type="number" id="umbral" step="any" inputmode="decimal">
+  </div>
+  <button type="button" id="actualizar" class="primario">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3v3.5h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Actualizar
+  </button>
+</section>
 
-  <!-- Requisito 5: mensaje de error -->
-  <div class="error" id="error" role="alert" hidden>
+<!-- ======================================================= ERROR (requisito 5) -->
+<div class="error" id="error" role="alert" hidden>
+  <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 5.5v5.5M10 13.6v.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  <div>
     <strong>No se pudo obtener el pronóstico.</strong>
-    <span id="error-texto"></span>
+    <p id="error-texto"></p>
+    <p class="error-pista" id="error-pista"></p>
+  </div>
+</div>
+
+<!-- ======================================================= PESTAÑAS -->
+<nav class="pestanas" role="tablist" aria-label="Secciones">
+  <button role="tab" aria-selected="true"  data-tab="resumen">Pronóstico</button>
+  <button role="tab" aria-selected="false" data-tab="explorar">Patrones históricos</button>
+  <button role="tab" aria-selected="false" data-tab="calidad">Calidad de datos</button>
+  <button role="tab" aria-selected="false" data-tab="modelo">Desempeño del modelo</button>
+  <button role="tab" aria-selected="false" data-tab="arquitectura">Cómo funciona</button>
+</nav>
+
+<main>
+<!-- ============================================ PESTAÑA 1: PRONÓSTICO -->
+<section class="panel" id="tab-resumen" role="tabpanel">
+
+  <article class="historia-card" aria-live="polite">
+    <p class="historia-etiqueta">Lo que dicen los datos</p>
+    <p class="historia-titular" id="titular">Cargando el pronóstico…</p>
+    <p class="historia-detalle" id="historia-detalle"></p>
+  </article>
+
+  <!-- requisito 3: indicadores -->
+  <div class="indicadores">
+    <article class="kpi kpi-principal">
+      <h3>Próxima hora</h3>
+      <p class="kpi-valor" id="k-proxima">—</p>
+      <p class="kpi-delta" id="k-proxima-delta">&nbsp;</p>
+      <p class="kpi-nota" id="k-proxima-nota">&nbsp;</p>
+    </article>
+    <article class="kpi">
+      <h3>Pico esperado</h3>
+      <p class="kpi-valor" id="k-pico">—</p>
+      <p class="kpi-delta" id="k-pico-delta">&nbsp;</p>
+      <p class="kpi-nota" id="k-pico-nota">&nbsp;</p>
+    </article>
+    <article class="kpi">
+      <h3>Valle esperado</h3>
+      <p class="kpi-valor" id="k-valle">—</p>
+      <p class="kpi-delta" id="k-valle-delta">&nbsp;</p>
+      <p class="kpi-nota" id="k-valle-nota">&nbsp;</p>
+    </article>
+    <article class="kpi" id="kpi-riesgo">
+      <h3>Riesgo de superar el umbral</h3>
+      <p class="kpi-valor" id="k-riesgo">—</p>
+      <p class="kpi-delta" id="k-riesgo-delta">&nbsp;</p>
+      <p class="kpi-nota" id="k-riesgo-nota">&nbsp;</p>
+    </article>
+    <article class="kpi">
+      <h3>Último dato real</h3>
+      <p class="kpi-valor kpi-fecha" id="k-ultimo">—</p>
+      <p class="kpi-delta" id="k-ultimo-delta">&nbsp;</p>
+      <p class="kpi-nota" id="k-ultimo-nota">&nbsp;</p>
+    </article>
   </div>
 
-  <!-- Requisito 3: indicadores destacados -->
-  <section class="indicadores" aria-label="Indicadores">
-    <article class="tarjeta indicador destacado">
-      <h2>Próxima hora</h2>
-      <p class="valor" id="ind-proxima">—</p>
-      <p class="detalle" id="ind-proxima-det">&nbsp;</p>
-    </article>
-    <article class="tarjeta indicador">
-      <h2>Máximo esperado</h2>
-      <p class="valor" id="ind-max">—</p>
-      <p class="detalle" id="ind-max-det">&nbsp;</p>
-    </article>
-    <article class="tarjeta indicador">
-      <h2>Mínimo esperado</h2>
-      <p class="valor" id="ind-min">—</p>
-      <p class="detalle" id="ind-min-det">&nbsp;</p>
-    </article>
-    <article class="tarjeta indicador">
-      <h2>Último dato real</h2>
-      <p class="valor pequeno" id="ind-ultimo">—</p>
-      <p class="detalle" id="ind-ultimo-det">&nbsp;</p>
-    </article>
-  </section>
+  <!-- requisito 1: gráfica -->
+  <article class="tarjeta">
+    <header class="tarjeta-cab">
+      <div>
+        <h2>Real, pronóstico y su incertidumbre</h2>
+        <p class="tarjeta-sub">Horas en hora de Colombia (UTC−5). La franja oscura es el intervalo del 80 %; la clara, el de la banda exterior.</p>
+      </div>
+      <details class="glosa">
+        <summary>¿Cómo leo esta gráfica?</summary>
+        <p>La línea oscura es lo que midió el sensor. La línea azul punteada es lo que el modelo espera. Las franjas son un margen de seguridad: si el modelo dice 300 con una franja de 250 a 350 al 95 %, en 95 de cada 100 casos parecidos el valor real cayó dentro de ese rango. La franja se ensancha hacia la derecha porque adivinar dentro de 24 horas es más difícil que dentro de una.</p>
+        <p>La línea gris de puntos es lo <em>habitual</em> a esa hora (la mediana de las últimas dos semanas): si el pronóstico va por encima, se espera más consumo del normal.</p>
+      </details>
+    </header>
+    <div class="lienzo lienzo-alto"><canvas id="g-principal" aria-label="Gráfica de histórico y pronóstico"></canvas></div>
+  </article>
 
-  <!-- Requisito 1: gráfica con histórico, pronóstico e intervalo -->
-  <section class="tarjeta grafica">
-    <div class="grafica-titulo">
-      <h2>Histórico y pronóstico</h2>
-      <span class="nota">Horas en hora de Colombia (UTC−5)</span>
-    </div>
-    <div class="lienzo"><canvas id="grafica"></canvas></div>
-    <p class="cargando" id="cargando" hidden>Consultando la API…</p>
-  </section>
-
-  <section class="dos-columnas">
+  <div class="dos-col">
     <article class="tarjeta">
-      <h2>Tabla del pronóstico</h2>
+      <header class="tarjeta-cab">
+        <div>
+          <h2>Probabilidad de superar el umbral, hora por hora</h2>
+          <p class="tarjeta-sub" id="riesgo-sub">Umbral: —</p>
+        </div>
+      </header>
+      <div class="lienzo"><canvas id="g-riesgo"></canvas></div>
+      <ul class="leyenda-estado">
+        <li><span class="sw sw-bien"></span>Bajo (&lt; 20 %)</li>
+        <li><span class="sw sw-aviso"></span>Moderado (20–50 %)</li>
+        <li><span class="sw sw-critico"></span>Alto (&gt; 50 %)</li>
+      </ul>
+    </article>
+    <article class="tarjeta">
+      <header class="tarjeta-cab">
+        <div>
+          <h2>Pronóstico frente a lo habitual</h2>
+          <p class="tarjeta-sub">Diferencia entre lo que se espera y la mediana de esa misma hora</p>
+        </div>
+      </header>
+      <div class="lienzo"><canvas id="g-vs-habitual"></canvas></div>
+      <p class="nota-pie" id="vs-habitual-nota"></p>
+    </article>
+  </div>
+
+  <article class="tarjeta">
+    <details class="tabla-plegable">
+      <summary><h2>Tabla del pronóstico</h2><span class="tarjeta-sub">Ver valores exactos</span></summary>
       <div class="tabla-scroll">
         <table>
-          <thead><tr><th>Hora (Colombia)</th><th>Pronóstico</th><th>Lím. inferior</th><th>Lím. superior</th></tr></thead>
+          <thead><tr><th>Hora (Colombia)</th><th>Pronóstico</th><th>Rango 80 %</th><th id="th-exterior">Rango 95 %</th><th>Habitual</th><th>P(&gt; umbral)</th></tr></thead>
           <tbody id="filas"></tbody>
         </table>
       </div>
+    </details>
+  </article>
+</section>
+
+<!-- ============================================ PESTAÑA 2: PATRONES -->
+<section class="panel" id="tab-explorar" role="tabpanel" hidden>
+  <div class="indicadores indicadores-3" id="patron-kpis"></div>
+
+  <article class="tarjeta">
+    <header class="tarjeta-cab">
+      <div>
+        <h2>Mapa de calor: cada día, hora por hora</h2>
+        <p class="tarjeta-sub">Cada fila es un día y cada columna una hora de Colombia. Más oscuro = más consumo. Las celdas con borde rojo son anomalías.</p>
+      </div>
+    </header>
+    <div class="mapa-calor" id="mapa-calor"></div>
+    <div class="escala" id="escala"></div>
+  </article>
+
+  <article class="tarjeta">
+    <header class="tarjeta-cab">
+      <div>
+        <h2>Un día típico</h2>
+        <p class="tarjeta-sub">Mediana por hora de las últimas 2 semanas. La franja cubre el 50 % central de los días (del cuartil 1 al 3).</p>
+      </div>
+      <details class="glosa">
+        <summary>¿Para qué sirve?</summary>
+        <p>Muestra la "rutina" del servidor. Si la línea de hoy se sale de la franja, hoy está pasando algo distinto a lo normal: más carga, un proceso nuevo o una falla.</p>
+      </details>
+    </header>
+    <div class="lienzo"><canvas id="g-perfil"></canvas></div>
+  </article>
+</section>
+
+<!-- ============================================ PESTAÑA 3: CALIDAD -->
+<section class="panel" id="tab-calidad" role="tabpanel" hidden>
+  <div class="indicadores indicadores-4" id="calidad-kpis"></div>
+
+  <article class="tarjeta">
+    <header class="tarjeta-cab">
+      <div>
+        <h2>Detección de anomalías</h2>
+        <p class="tarjeta-sub">Un valor es anómalo si se aleja más de 3,5 desviaciones robustas de lo habitual para su hora.</p>
+      </div>
+      <details class="glosa">
+        <summary>¿Cómo se detectan?</summary>
+        <p>Para cada hora del día se calcula la mediana y la dispersión típica (MAD) de las últimas dos semanas. Se usan la mediana y la MAD, y no el promedio, porque una sola falla no las desplaza. Un punto se marca si queda más allá de la franja. La detección no borra datos: los señala para que una persona decida si es una falla del sensor o un evento real.</p>
+      </details>
+    </header>
+    <div class="lienzo lienzo-alto"><canvas id="g-anomalias"></canvas></div>
+    <div class="tabla-scroll tabla-corta">
+      <table>
+        <thead><tr><th>Hora (Colombia)</th><th>Valor</th><th>Habitual</th><th>Desvío</th><th>Tipo</th></tr></thead>
+        <tbody id="filas-anomalias"></tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="tarjeta">
+    <h2>Cómo se tratan los problemas de calidad</h2>
+    <div class="pasos">
+      <div class="paso"><span class="paso-n">1</span><h4>Promedio horario</h4><p>InfluxDB agrupa las lecturas del sensor en promedios de 1 hora. Esto suaviza el ruido de lecturas sueltas.</p></div>
+      <div class="paso"><span class="paso-n">2</span><h4>Hora incompleta fuera</h4><p>La hora en curso se descarta: promediar solo 20 minutos daría un valor engañoso.</p></div>
+      <div class="paso"><span class="paso-n">3</span><h4>Relleno de huecos</h4><p>Huecos de hasta 6 h se rellenan por interpolación en el tiempo; los más largos repiten el último valor. Cada hora rellenada se cuenta y se reporta.</p></div>
+      <div class="paso"><span class="paso-n">4</span><h4>Atípicos al entrenar</h4><p>En Colab, los valores fuera de las cercas de Tukey (K = 3) se reemplazan por interpolación antes de entrenar.</p></div>
+      <div class="paso"><span class="paso-n">5</span><h4>Cambio de nivel</h4><p>Si las últimas 24 h se alejan más de un 20 % de lo habitual, el panel lo marca como posible recalibración o cambio de carga.</p></div>
+    </div>
+  </article>
+</section>
+
+<!-- ============================================ PESTAÑA 4: MODELO -->
+<section class="panel" id="tab-modelo" role="tabpanel" hidden>
+  <div class="dos-col">
+    <article class="tarjeta">
+      <h2>Ficha del modelo</h2>
+      <dl class="ficha" id="ficha"><dt>Estado</dt><dd>Cargando…</dd></dl>
+    </article>
+    <article class="tarjeta" id="tarjeta-reentreno">
+      <h2>¿Toca reentrenar?</h2>
+      <div id="reentreno"></div>
+    </article>
+  </div>
+
+  <article class="tarjeta">
+    <header class="tarjeta-cab">
+      <div>
+        <h2>Error en la prueba final (últimas 24 h del entrenamiento)</h2>
+        <p class="tarjeta-sub">Menos es mejor. La línea base ingenua predice que cada hora vale lo mismo que hace 24 h.</p>
+      </div>
+      <details class="glosa">
+        <summary>¿Qué significa cada métrica?</summary>
+        <p><b>MAE</b>: en promedio, cuánto se equivoca el pronóstico por hora, en las mismas unidades del consumo. <b>RMSE</b>: parecido, pero castiga más los errores grandes. <b>MAPE</b>: el error como porcentaje del valor real.</p>
+      </details>
+    </header>
+    <div class="metricas" id="metricas"></div>
+    <div class="lienzo lienzo-bajo"><canvas id="g-metricas"></canvas></div>
+  </article>
+
+  <article class="tarjeta">
+    <header class="tarjeta-cab">
+      <div>
+        <h2>La incertidumbre crece con el horizonte</h2>
+        <p class="tarjeta-sub">Ancho de la banda exterior según cuántas horas hacia adelante se pronostica</p>
+      </div>
+    </header>
+    <div class="lienzo lienzo-bajo"><canvas id="g-ancho"></canvas></div>
+    <p class="nota-pie" id="ancho-nota"></p>
+  </article>
+
+  <article class="tarjeta">
+    <h2>Estrategia de reentrenamiento</h2>
+    <div class="pasos">
+      <div class="paso"><span class="paso-n">1</span><h4>Programado</h4><p>Reentrenar cada 7 días con los últimos 30 días de datos, para que el modelo aprenda los cambios lentos de la carga.</p></div>
+      <div class="paso"><span class="paso-n">2</span><h4>Por evento</h4><p>Reentrenar antes de tiempo si este panel detecta un cambio de nivel (&gt; 20 %) o anomalías repetidas.</p></div>
+      <div class="paso"><span class="paso-n">3</span><h4>Con control</h4><p>El modelo nuevo solo reemplaza al anterior si su MAE de prueba es menor y le gana a la línea base ingenua.</p></div>
+      <div class="paso"><span class="paso-n">4</span><h4>Sin apagar el servicio</h4><p>El JSON nuevo se sube a <code>models/</code> y se activa con <code>POST /api/modelo/recargar</code>, sin reiniciar la API.</p></div>
+    </div>
+  </article>
+</section>
+
+<!-- ============================================ PESTAÑA 5: ARQUITECTURA -->
+<section class="panel" id="tab-arquitectura" role="tabpanel" hidden>
+  <article class="tarjeta">
+    <h2>Del sensor a esta pantalla</h2>
+    <p class="tarjeta-sub">Cada caja muestra su estado en vivo.</p>
+    <div class="flujo" id="flujo"></div>
+  </article>
+
+  <div class="tres-col">
+    <article class="tarjeta">
+      <h2>Seguridad de los datos</h2>
+      <ul class="lista">
+        <li>El token de InfluxDB vive solo en los <b>secrets</b> de Codespaces y de Colab; nunca en el código ni en el historial de Git.</li>
+        <li>La imagen Docker <b>no contiene credenciales</b>: se entregan al arrancar con <code>-e</code>, y el <code>.dockerignore</code> excluye el <code>.env</code>.</li>
+        <li>La API solo acepta <b>lecturas (GET)</b>; la base de datos no se puede modificar desde aquí.</li>
+        <li>El modelo se exporta como <b>JSON</b> (números), no como pickle: cargarlo no ejecuta código.</li>
+      </ul>
     </article>
     <article class="tarjeta">
-      <h2>Sobre el modelo</h2>
-      <dl class="modelo" id="modelo">
-        <dt>Estado</dt><dd>Cargando…</dd>
-      </dl>
+      <h2>Escalabilidad</h2>
+      <ul class="lista">
+        <li>El contenedor <b>no guarda estado</b>: se pueden correr varias copias detrás de un balanceador.</li>
+        <li>El modelo <b>no se reentrena en cada consulta</b>: aplica parámetros ya estimados, así que responde en milisegundos.</li>
+        <li>InfluxDB entrega <b>promedios horarios</b> ya agregados, no millones de lecturas crudas.</li>
+        <li>Para más sensores: un JSON de modelo por serie, el mismo contenedor.</li>
+      </ul>
     </article>
-  </section>
+    <article class="tarjeta">
+      <h2>Integración por API</h2>
+      <ul class="lista api">
+        <li><code>GET /api/prediccion</code><span>pronóstico + intervalos</span></li>
+        <li><code>GET /api/historico</code><span>promedios horarios</span></li>
+        <li><code>GET /api/modelo</code><span>ficha y métricas</span></li>
+        <li><code>GET /api/salud</code><span>estado del servicio</span></li>
+        <li><code>POST /api/modelo/recargar</code><span>activar modelo nuevo</span></li>
+      </ul>
+      <a class="enlace" href="/docs" target="_blank" rel="noopener">Abrir documentación interactiva →</a>
+    </article>
+  </div>
+
+  <article class="tarjeta">
+    <h2>Glosario</h2>
+    <dl class="glosario">
+      <dt>SARIMA</dt><dd>Modelo que predice el futuro de una serie usando sus valores recientes y su patrón repetitivo, aquí el ciclo de 24 horas.</dd>
+      <dt>Intervalo de confianza</dt><dd>Rango donde probablemente caerá el valor real. Al 95 %: acierta en 95 de cada 100 casos parecidos.</dd>
+      <dt>Línea base ingenua</dt><dd>La predicción más simple posible: "mañana a esta hora pasará lo mismo que hoy". Un buen modelo debe ganarle.</dd>
+      <dt>Anomalía</dt><dd>Un valor muy distinto de lo habitual para su hora. Puede ser una falla del sensor o un evento real.</dd>
+      <dt>UTC</dt><dd>Hora universal. Colombia está 5 horas atrás (UTC−5). La API trabaja en UTC; este panel lo convierte.</dd>
+    </dl>
+  </article>
+</section>
 </main>
 
-<footer>Computación Avanzada (ET0197) · FastAPI + SARIMA + InfluxDB</footer>
+<div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+
+<footer>Computación Avanzada · FastAPI + SARIMA + InfluxDB + Docker · <span id="pie-host"></span></footer>
 
 <script src="/static/app.js"></script>
 </body>

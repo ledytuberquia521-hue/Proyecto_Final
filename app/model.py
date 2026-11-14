@@ -81,7 +81,7 @@ class ModeloSARIMA:
     def info(self) -> dict:
         """Metadatos para mostrar en el frontend (sin parámetros crudos)."""
         claves = ["order", "seasonal_order", "trend", "measurement", "field",
-                  "entrenado_en", "n_observaciones", "metricas_test",
+                  "entrenado_en", "n_observaciones", "metricas_test", "metricas_ingenua",
                   "rango_entrenamiento", "versiones"]
         return {k: self.config.get(k) for k in claves if k in self.config}
 
